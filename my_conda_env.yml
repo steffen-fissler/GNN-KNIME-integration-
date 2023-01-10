@@ -1,0 +1,18 @@
+name: knime-pyg-node
+channels:
+- conda-forge
+- pyg
+- pytorch
+- knime
+dependencies:
+- python=3.9
+- py4j
+- pandas
+- pyarrow
+- numpy
+- packaging
+- pytorch
+- cpuonly
+- pyg
+- knime-extension
+- markdown
