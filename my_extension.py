@@ -4,6 +4,41 @@ import logging
 
 LOGGER = logging.getLogger(__name__)
 
+@knext.node(name="GNN Network", node_type=knext.NodeType.MANIPULATOR, icon_path="icon.png", category="/")
+@knext.input_table(name="Features of Edges", description="Give a sparse matrix of edges and their features")
+@knext.input_table(name="Edges", description="Give two columns: one with a node and second column with the paired node")
+@knext.output_binary(
+    name="GNN Network",
+    description="Pytorch Geometric Graph Constructor",
+    id="org.knime.torch.construct")
+class ConstructGraph:
+    """
+    Partition GNN into Learner and Predictior
+    """
+    def configure(self, configure_context, input_schema_1, input_schema_2):
+        return knext.BinaryPortObjectSpec("org.knime.torch.construct")
+    def execute(self, exec_context, input_1, input_2):
+        features = input_1.to_pandas()
+        edges = input_2.to_pandas()
+        
+        g = self.construct_graph(features=features,
+                                edges=edges,
+                                exec=knext.ExecutionContext)
+        return pickle.dumps(g)
+    
+    def construct_graph(self, features, edges, exec: knext.ExecutionContext):
+        node_features_list=features.drop(columns=['Key']).values.tolist()
+        node_features=torch.tensor(node_features_list)
+        node_labels=torch.tensor(features['ml_target'].values)
+        edges_list=edges.values.tolist()
+        edge_index01=torch.tensor(edges_list, dtype = torch.long).T
+        edge_index02=torch.zeros(edge_index01.shape, dtype = torch.long)
+        edge_index02[0,:]=edge_index01[1,:]
+        edge_index02[1,:]=edge_index01[0,:]
+        edge_index0=torch.cat((edge_index01,edge_index02),axis=1)
+        g = Data(x=node_features, y=node_labels, edge_index=edge_index0)
+        return(g)
+
 @knext.node(name="GNN Partition", node_type=knext.NodeType.MANIPULATOR, icon_path="icon.png", category="/")
 @knext.input_table(name="Features of Edges", description="Give a sparse matrix of edges and their features")
 @knext.input_table(name="Edges", description="Give two columns: one with a node and second column with the paired node")
