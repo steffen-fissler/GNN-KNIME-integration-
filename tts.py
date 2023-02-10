@@ -1,4 +1,3 @@
-import knime_extension as knext
 from io import BytesIO
 import pyarrow as pa
 import pickle
@@ -14,7 +13,6 @@ import collections
 import itertools
 from itertools import combinations 
 from shutil import copy
-
 
 import torch
 import torch.nn as nn
@@ -148,3 +146,27 @@ class AddTrainValTestMask(object):
 
     def __repr__(self):
         return '{}(split={})'.format(self.__class__.__name__, self.split)
+
+class AddMask(object):
+    """
+    Recive a graph object and a table.
+    Create a mask with only table rows.
+    """
+    def __init__(self):
+        return
+    
+    def __call__(self,graph,data):
+        data_mask = self.__data_mask__(graph, data)
+        graph.data_mask = data_mask
+        return graph
+    
+    def __data_mask__(self,graph, data):
+        data_mask = torch.zeros(graph.num_nodes, dtype=torch.bool)
+        mask_idx = data['Key'].to_list()
+        data_mask[mask_idx]=True
+        
+        return data_mask 
+    
+    def __repr__(self):
+        return '{}(split={})'.format(self.__class__.__name__, self.split)
+        
