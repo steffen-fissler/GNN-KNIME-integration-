@@ -15,30 +15,33 @@ class PygCreator:
     """
     Take two tables to construct a full graph. 
     """
+    key = knext.ColumnParameter(label="key", description="Index number of each row", port_index=0)
+    target_column = knext.ColumnParameter(label="target_column", description="The label (y) of each row", port_index=0)
+
     def configure(self, configure_context, input_schema_1, input_schema_2):
         return knext.BinaryPortObjectSpec("org.knime.torch.graphcreator")
 
     def execute(self, exec_context, input_1, input_2):
-        features = input_1.to_pandas()
-        edges = input_2.to_pandas()
+        nodes_data = input_1.to_pandas()
+        edges_data = input_2.to_pandas()
         
-        g = self.construct_graph(features=features,
-                                edges=edges,
+        g = self.construct_graph(nodes_data=nodes_data,
+                                edges_data=edges_data,
                                 exec=knext.ExecutionContext)
 
         return pickle.dumps(g)
     
-    def construct_graph(self, features, edges, exec: knext.ExecutionContext):
-        node_features_list=features.drop(columns=['Key','ml_target']).values.tolist()
-        node_features=torch.tensor(node_features_list)
-        node_labels=torch.tensor(features['ml_target'].values)
-        edges_list=edges.values.tolist()
-        edge_index01=torch.tensor(edges_list, dtype = torch.long).T
-        edge_index02=torch.zeros(edge_index01.shape, dtype = torch.long)
-        edge_index02[0,:]=edge_index01[1,:]
-        edge_index02[1,:]=edge_index01[0,:]
-        edge_index0=torch.cat((edge_index01,edge_index02),axis=1)
-        g = Data(x=node_features, y=node_labels, edge_index=edge_index0)
+    def construct_graph(self, nodes_data, edges_data, exec:knext.ExecutionContext):
+        node_features_list = nodes_data.drop(columns=[self.key,self.target_column]).values.tolist()
+        node_features = torch.tensor(node_features_list)
+        node_labels = torch.tensor(nodes_data[self.target_column].values)
+        edges_list = edges_data.values.tolist()
+        edge_index01 = torch.tensor(edges_list, dtype = torch.long).T
+        edge_index02 = torch.zeros(edge_index01.shape, dtype = torch.long)
+        edge_index02[0,:] = edge_index01[1,:]
+        edge_index02[1,:] = edge_index01[0,:]
+        edge_index = torch.cat((edge_index01,edge_index02),axis=1)
+        g = Data(x=node_features, y=node_labels, edge_index=edge_index)
         return(g)
 
 
@@ -169,9 +172,6 @@ class PygSplitterLearner:
 @knext.output_table("Table with Prediction", "Append prediction probability and class to table")
 class PygPredictor :
     """
-    Short one-line description of the node.
-    Long description of the node.
-    Can be multiple lines.
     """
     prediction_confidence = knext.BoolParameter("Append overall prediction confidence", "does not work at the moment", False)
 
