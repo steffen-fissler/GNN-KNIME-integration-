@@ -17,6 +17,9 @@ class PygCreator:
     """
     key = knext.ColumnParameter(label="key", description="Index number of each row", port_index=0)
     target_column = knext.ColumnParameter(label="target_column", description="The label (y) of each row", port_index=0)
+    edge_list_01 = knext.ColumnParameter(label="edge_list_01", description="The first column of edges", port_index=1)
+    edge_list_02 = knext.ColumnParameter(label="edge_list_02", description="The second column of edges", port_index=1)
+    #TODO add edge features for other kinds of analysis
 
     def configure(self, configure_context, input_schema_1, input_schema_2):
         return knext.BinaryPortObjectSpec("org.knime.torch.graphcreator")
@@ -35,7 +38,7 @@ class PygCreator:
         node_features_list = nodes_data.drop(columns=[self.key,self.target_column]).values.tolist()
         node_features = torch.tensor(node_features_list)
         node_labels = torch.tensor(nodes_data[self.target_column].values)
-        edges_list = edges_data.values.tolist()
+        edges_list = edges_data[[self.edge_list_01, self.edge_list_02]].values.tolist()
         edge_index01 = torch.tensor(edges_list, dtype = torch.long).T
         edge_index02 = torch.zeros(edge_index01.shape, dtype = torch.long)
         edge_index02[0,:] = edge_index01[1,:]
