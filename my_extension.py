@@ -4,7 +4,7 @@ import logging
 
 LOGGER = logging.getLogger(__name__)
 
-@knext.node(name="Pytorch Graph Creator", node_type=knext.NodeType.MANIPULATOR, icon_path="icon.png", category="/")
+@knext.node(name="GCN Graph Creator", node_type=knext.NodeType.MANIPULATOR, icon_path="icon.png", category="/")
 @knext.input_table(name="Nodes with Features", description="Give a table of ndoes with features and target.")
 @knext.input_table(name="Edges", description="Give two columns: one with a node and second column with the paired node")
 @knext.output_binary(
@@ -16,7 +16,7 @@ class PygCreator:
     Take two tables to construct a full graph. 
     """
     key = knext.ColumnParameter(label="key", description="Index number of each row", port_index=0)
-    target_column = knext.ColumnParameter(label="target_column", description="The label (y) of each row", port_index=0)
+    target = knext.ColumnParameter(label="target", description="The label (y) of each row", port_index=0)
     edge_list_01 = knext.ColumnParameter(label="edge_list_01", description="The first column of edges", port_index=1)
     edge_list_02 = knext.ColumnParameter(label="edge_list_02", description="The second column of edges", port_index=1)
     #TODO add edge features for other kinds of analysis
@@ -35,9 +35,9 @@ class PygCreator:
         return pickle.dumps(g)
     
     def construct_graph(self, nodes_data, edges_data, exec:knext.ExecutionContext):
-        node_features_list = nodes_data.drop(columns=[self.key,self.target_column]).values.tolist()
+        node_features_list = nodes_data.drop(columns=[self.key,self.target]).values.tolist()
         node_features = torch.tensor(node_features_list)
-        node_labels = torch.tensor(nodes_data[self.target_column].values)
+        node_labels = torch.tensor(nodes_data[self.target].values)
         edges_list = edges_data[[self.edge_list_01, self.edge_list_02]].values.tolist()
         edge_index01 = torch.tensor(edges_list, dtype = torch.long).T
         edge_index02 = torch.zeros(edge_index01.shape, dtype = torch.long)
@@ -48,7 +48,7 @@ class PygCreator:
         return(g)
 
 
-@knext.node(name="Pytorch Mask Creator", node_type=knext.NodeType.MANIPULATOR, icon_path="icon.png", category="/")
+@knext.node(name="GCN Mask Creator", node_type=knext.NodeType.MANIPULATOR, icon_path="icon.png", category="/")
 @knext.input_binary("Full Graph", "Pickled Graph", "org.knime.torch.graphcreator" )
 @knext.input_table(name="Mask Table", description="A table that contains nodes need to be masked and passed on.")
 @knext.output_binary(
@@ -73,7 +73,7 @@ class PygMaskCreator:
     
 
 
-@knext.node(name="Pytorch GCN learner", node_type=knext.NodeType.LEARNER, icon_path="icon.png", category="/")
+@knext.node(name="GCN Learner", node_type=knext.NodeType.LEARNER, icon_path="icon.png", category="/")
 @knext.input_binary("Full Masked Graph", "Masked Graph", "org.knime.torch.mask")
 @knext.output_binary(
     name="Model",
@@ -108,9 +108,9 @@ class PygSplitterLearner:
         return pickle.dumps(model_dict)#, knext.Table.from_pyarrow(statistics_table)
 
     def construct_graph(self, features, edges, target_df, exec: knext.ExecutionContext):
-        node_features_list=features.drop(columns=['Key']).values.tolist()
+        node_features_list=features.drop(columns=[self.key]).values.tolist()
         node_features=torch.tensor(node_features_list)
-        node_labels=torch.tensor(target_df['ml_target'].values)
+        node_labels=torch.tensor(target_df[self.target].values)
         edges_list=edges.values.tolist()
         edge_index01=torch.tensor(edges_list, dtype = torch.long).T
         edge_index02=torch.zeros(edge_index01.shape, dtype = torch.long)
@@ -123,7 +123,7 @@ class PygSplitterLearner:
     def masked_loss(self, predictions, labels, mask, exec: knext.ExecutionContext):
         mask=mask.float()
         mask=mask/torch.mean(mask)
-        # had to add the type longtensor
+        # had to add the type longtensor 
         loss=self.criterion(predictions,labels.type(torch.LongTensor))
         loss=loss*mask
         loss=torch.mean(loss)
@@ -169,18 +169,25 @@ class PygSplitterLearner:
         return train_accuracies, buffer
 
 
-@knext.node(name="GNN Predictor", node_type=knext.NodeType.PREDICTOR, icon_path="icon.png", category="/")
+@knext.node(name="GCN Predictor", node_type=knext.NodeType.PREDICTOR, icon_path="icon.png", category="/")
 @knext.input_binary("GNN model", "The trained model", "org.knime.torch.pygmodel")
 @knext.input_binary("Graph masked", "Test on market",  "org.knime.torch.mask")
 @knext.output_table("Table with Prediction", "Append prediction probability and class to table")
-class PygPredictor :
+class PygPredictor:
     """
     """
-    prediction_confidence = knext.BoolParameter("Append overall prediction confidence", "does not work at the moment", False)
+    prediction_confidence = knext.BoolParameter("Append overall prediction confidence", "Probability of being the 1 class", False)
 
     def configure(self, configure_context, input_schema_1,input_binary_1):
-        # return knext.Schema.from_columns([knext.Column(knext.string(), "<Row Key>"), knext.Column(knext.double(), "Test Accuracy")])
-        return knext.Schema([knext.double()], ["Table with Prediction"])
+        if self.prediction_confidence:
+            return knext.Schema.from_columns([knext.Column(knext.double(), "Predictions"), 
+                                              knext.Column(knext.double(), "Actual Target"),
+                                              knext.Column(knext.double(), "Confidence")])
+        else: 
+            return knext.Schema.from_columns([knext.Column(knext.double(), "Predictions"), 
+                                              knext.Column(knext.double(), "Actual Target")])
+
+        # return knext.Schema([knext.double()], ["Table with Prediction"])
  
     def execute(self, exec_context, model_object, mask_data):
         model_dict = pickle.loads(model_object)
@@ -199,10 +206,19 @@ class PygPredictor :
                                              mask=mask_data.data_mask,
                                              exec=knext.ExecutionContext)
 
-        test_accuracy = [float(test_accuracy)] # had to add float to work with pyarrow
+        # test_accuracy = [float(test_accuracy)] # had to add float to work with pyarrow
+       
+        labels = graph.y[mask_data.data_mask].tolist()
+        predictions = (torch.argmax(out,axis=1)[mask_data.data_mask]).tolist()
+        if self.prediction_confidence:
+            probabilities = out[mask_data.data_mask]
+            # convert logits output to probability
+            probabilities = torch.nn.functional.softmax(probabilities)[ :, 0].tolist()
+            output_table = pa.table([pa.array(labels), pa.array(predictions), pa.array(probabilities)], names=["Target", "Predictions", "Confidence of being class 0"])
+        else:
+            output_table = pa.table([pa.array(labels), pa.array(predictions)], names=["Target", "Predictions"])
 
-        statistics_table = pa.table([pa.array(test_accuracy)], names=["Test Accuracy"])
-        return knext.Table.from_pyarrow(statistics_table)
+        return knext.Table.from_pyarrow(output_table)
 
     def masked_accuracy(self, predictions, labels, mask, exec: knext.ExecutionContext):
         mask=mask.float()
