@@ -16,7 +16,7 @@ class GCNCreator:
     Take two tables to construct a full graph. 
     """
     key = knext.ColumnParameter(label="key", description="Index number of each row", port_index=0)
-    target = knext.ColumnParameter(label="target", description="The label (y) of each row", port_index=0)
+    target = knext.ColumnParameter(label="target", description="The label (y) of each row", port_index=0) #TODO how to select from a list of column
     edge_list_01 = knext.ColumnParameter(label="edge_list_01", description="The first column of edges", port_index=1)
     edge_list_02 = knext.ColumnParameter(label="edge_list_02", description="The second column of edges", port_index=1)
     #TODO add edge features for other kinds of analysis
@@ -25,14 +25,22 @@ class GCNCreator:
         return knext.BinaryPortObjectSpec("org.knime.torch.graphcreator")
 
     def execute(self, exec_context, input_1, input_2):
-        nodes_data = input_2.to_pandas()
         edges_data = input_1.to_pandas()
+        nodes_data = input_2.to_pandas()
+        num_class = nodes_data['ml_target'].nunique()
+
+        # handle missing values in target variables
+        if nodes_data['ml_target'].isna().any(): #TODO hardcode target column
+            indices_with_none = np.where(nodes_data['ml_target'].isna())
+            nodes_data.loc[indices_with_none, 'ml_target'] = num_class+1 
         
         g = self.construct_graph(nodes_data=nodes_data,
-                                edges_data=edges_data,
-                                exec=knext.ExecutionContext)
+                                 edges_data=edges_data,
+                                 exec=knext.ExecutionContext)
+        graph_dict = {'graph':g,
+                      'num_of_class':num_class}
 
-        return pickle.dumps(g)
+        return pickle.dumps(graph_dict)
     
     def construct_graph(self, nodes_data, edges_data, exec:knext.ExecutionContext):
         node_features_list = nodes_data.drop(columns=[self.key,self.target]).values.tolist()
@@ -68,34 +76,29 @@ class GCNLearner:
     def configure(self, configure_context, input_binary_1, input_schema_1):
         return knext.BinaryPortObjectSpec("org.knime.torch.learner")
          
-    def execute(self, exec_context, graph, train_set):
+    def execute(self, exec_context, graph_dict, train_set):
         train_set = train_set.to_pandas()
+        graph_dict = pickle.loads(graph_dict)
+
+        graph = graph_dict['graph']
         msk = AddMask()
-        graph = pickle.loads(graph)
         masked_graph = msk(graph, train_set)
+
+        num_class = graph_dict['num_of_class']
         num_of_feat = masked_graph.num_node_features
-        model = SocialGNN(num_of_feat=num_of_feat, f=16)
+        model = SocialGNN(num_of_feat=num_of_feat,
+                          hidden_layer=16,
+                          num_class=num_class)
 
         train_accuracies, buffer = self.train_social(model, masked_graph, knext.ExecutionContext)
 
         model_dict = {"model": buffer.read(),
                       "data": graph,
-                      "num_of_feat": num_of_feat}
+                      "train_accuracies": train_accuracies,
+                      "num_of_feat": num_of_feat,
+                      "num_of_class": num_class}
         # statistics_table = pa.table([pa.array([str(i) for i in range(len(train_accuracies))]), pa.array(train_accuracies)], names=["Train Accuracy"])
         return pickle.dumps(model_dict)#, knext.Table.from_pyarrow(statistics_table)
-
-    def construct_graph(self, features, edges, target_df, exec: knext.ExecutionContext):
-        node_features_list=features.drop(columns=[self.key]).values.tolist()
-        node_features=torch.tensor(node_features_list)
-        node_labels=torch.tensor(target_df[self.target].values)
-        edges_list=edges.values.tolist()
-        edge_index01=torch.tensor(edges_list, dtype = torch.long).T
-        edge_index02=torch.zeros(edge_index01.shape, dtype = torch.long)
-        edge_index02[0,:]=edge_index01[1,:]
-        edge_index02[1,:]=edge_index01[0,:]
-        edge_index0=torch.cat((edge_index01,edge_index02),axis=1)
-        g = Data(x=node_features, y=node_labels, edge_index=edge_index0)
-        return(g)
 
     def masked_loss(self, predictions, labels, mask, exec: knext.ExecutionContext):
         mask=mask.float()
@@ -171,11 +174,14 @@ class GCNPredictor:
         msk = AddMask()
 
         model_dict = pickle.loads(model_object)
-        num_of_feat = model_dict["num_of_feat"]
         graph = model_dict["data"]
+        num_of_feat = model_dict["num_of_feat"]
+        num_class = model_dict["num_of_class"]
         masked_graph = msk(graph, test_set)
 
-        model = SocialGNN(num_of_feat=num_of_feat, f=16)
+        model = SocialGNN(num_of_feat=num_of_feat,
+                          hidden_layer = 16,
+                          num_class=num_class)
 
         state_dict = torch.load(BytesIO(model_dict["model"]))
         model.load_state_dict(state_dict)
