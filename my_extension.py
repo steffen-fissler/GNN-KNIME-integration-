@@ -11,36 +11,42 @@ LOGGER = logging.getLogger(__name__)
     name="Graph",
     description="Pytorch Geometric Graph",
     id="org.knime.torch.graphcreator")
+# @knext.output_table("Target Data", "Used for debugging") # DEBUGGING CODE
 class GCNCreator:
     """
     Take two tables to construct a full graph. 
     """
-    key = knext.ColumnParameter(label="key", description="Index number of each row", port_index=0)
-    target = knext.ColumnParameter(label="target", description="The label (y) of each row", port_index=0) #TODO how to select from a list of column
-    edge_list_01 = knext.ColumnParameter(label="edge_list_01", description="The first column of edges", port_index=1)
-    edge_list_02 = knext.ColumnParameter(label="edge_list_02", description="The second column of edges", port_index=1)
+    key = knext.ColumnParameter(label="key", description="Index number of each row", port_index=1)
+    target = knext.ColumnParameter(label="target", description="The label (y) of each row", port_index=1) #TODO how to select from a list of column
+    edge_list_01 = knext.ColumnParameter(label="edge_list_01", description="The first column of edges", port_index=0)
+    edge_list_02 = knext.ColumnParameter(label="edge_list_02", description="The second column of edges", port_index=0)
     #TODO add edge features for other kinds of analysis
 
     def configure(self, configure_context, input_schema_1, input_schema_2):
         return knext.BinaryPortObjectSpec("org.knime.torch.graphcreator")
+        # return knext.Schema.from_columns([knext.Column(knext.double(), "Target")])
 
     def execute(self, exec_context, input_1, input_2):
         edges_data = input_1.to_pandas()
         nodes_data = input_2.to_pandas()
-        num_class = nodes_data['ml_target'].nunique()
+        num_class = nodes_data[self.target].nunique()
 
         # handle missing values in target variables
-        if nodes_data['ml_target'].isna().any(): #TODO hardcode target column
-            indices_with_none = np.where(nodes_data['ml_target'].isna())
-            nodes_data.loc[indices_with_none, 'ml_target'] = num_class+1 
+        nodes_data[self.target].fillna(num_class-1, inplace=True) #TODO we need to tell the user to transform missing values into 0/0
         
         g = self.construct_graph(nodes_data=nodes_data,
                                  edges_data=edges_data,
                                  exec=knext.ExecutionContext)
         graph_dict = {'graph':g,
-                      'num_of_class':num_class}
+                      'num_of_class':num_class,
+                      'key': self.key}
 
         return pickle.dumps(graph_dict)
+        
+        # DEBUGGING CODE:
+        # labels = list(nodes_data[self.target])
+        # output_table = pa.table([pa.array(labels)], names=["Target"])
+        # return knext.Table.from_pyarrow(output_table)
     
     def construct_graph(self, nodes_data, edges_data, exec:knext.ExecutionContext):
         node_features_list = nodes_data.drop(columns=[self.key,self.target]).values.tolist()
@@ -96,8 +102,10 @@ class GCNLearner:
                       "data": graph,
                       "train_accuracies": train_accuracies,
                       "num_of_feat": num_of_feat,
-                      "num_of_class": num_class}
+                      "num_of_class": num_class,
+                      "key": graph_dict["key"]}
         # statistics_table = pa.table([pa.array([str(i) for i in range(len(train_accuracies))]), pa.array(train_accuracies)], names=["Train Accuracy"])
+        
         return pickle.dumps(model_dict)#, knext.Table.from_pyarrow(statistics_table)
 
     def masked_loss(self, predictions, labels, mask, exec: knext.ExecutionContext):
@@ -188,6 +196,7 @@ class GCNPredictor:
         model.eval()
         out = model(graph)
        
+        key = list(test_set[model_dict["key"]])
         labels = graph.y[masked_graph.data_mask].tolist()
         predictions = (torch.argmax(out,axis=1)[masked_graph.data_mask]).tolist()
 
@@ -195,8 +204,8 @@ class GCNPredictor:
             probabilities = out[masked_graph.data_mask]
             # convert logits output to probability
             probabilities = torch.nn.functional.softmax(probabilities)[ :, 0].tolist()
-            output_table = pa.table([pa.array(labels), pa.array(predictions), pa.array(probabilities)], names=["Target", "Predictions", "Confidence of being class 0"])
+            output_table = pa.table([pa.array(key), pa.array(labels), pa.array(predictions), pa.array(probabilities)], names=["Key", "Target", "Predictions", "Confidence of being class 0"])
         else:
-            output_table = pa.table([pa.array(labels), pa.array(predictions)], names=["Target", "Predictions"])
+            output_table = pa.table([pa.array(key), pa.array(labels), pa.array(predictions)], names=["Key", "Target", "Predictions"])
 
         return knext.Table.from_pyarrow(output_table)
