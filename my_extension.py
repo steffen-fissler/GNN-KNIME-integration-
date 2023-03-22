@@ -87,7 +87,7 @@ class GCNLearner:
         graph_dict = pickle.loads(graph_dict)
 
         graph = graph_dict['graph']
-        msk = AddMask()
+        msk = AddMask(graph_dict['key'])
         masked_graph = msk(graph, train_set)
 
         num_class = graph_dict['num_of_class']
@@ -179,12 +179,11 @@ class GCNPredictor:
 
     def execute(self, exec_context, model_object, test_set):
         test_set = test_set.to_pandas()
-        msk = AddMask()
-
         model_dict = pickle.loads(model_object)
         graph = model_dict["data"]
         num_of_feat = model_dict["num_of_feat"]
         num_class = model_dict["num_of_class"]
+        msk = AddMask(model_dict["key"])
         masked_graph = msk(graph, test_set)
 
         model = SocialGNN(num_of_feat=num_of_feat,
