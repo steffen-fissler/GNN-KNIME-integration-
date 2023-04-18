@@ -4,27 +4,31 @@ import logging
 
 LOGGER = logging.getLogger(__name__)
 
-@knext.node(name="GNN Graph Creator", node_type=knext.NodeType.MANIPULATOR, icon_path="icon.png", category="/")
-@knext.input_table(name="Nodes with Features", description="Give a table of ndoes with features and target.")
-@knext.input_table(name="Edges", description="Give two columns: one with a node and second column with the paired node")
+@knext.node(name="GNN Graph Creator", node_type=knext.NodeType.MANIPULATOR, 
+            icon_path="icon.png", category="/")
+@knext.input_table(name="Nodes with Features", 
+                   description="Give a table of nodes with features and target.")
+@knext.input_table(name="Edges", 
+                   description="Give two columns: one with a node and second column with the paired node")
 @knext.output_binary(
     name="Graph",
     description="Pytorch Geometric Graph",
     id="org.knime.torch.graphcreator")
-# @knext.output_table("Target Data", "Used for debugging") # DEBUGGING CODE
 class GNNCreator:
     """
-    Take two tables to construct a full graph. 
+    Takes two tables to construct a full graph. 
     """
-    key = knext.ColumnParameter(label="key", description="Index number of each row", port_index=1)
-    target = knext.ColumnParameter(label="target", description="The label (y) of each row", port_index=1) #TODO how to select from a list of column
-    edge_list_01 = knext.ColumnParameter(label="edge_list_01", description="The first column of edges", port_index=0)
-    edge_list_02 = knext.ColumnParameter(label="edge_list_02", description="The second column of edges", port_index=0)
-    #TODO add edge features for other kinds of analysis
+    key = knext.ColumnParameter(label="key", 
+                                description="Unique id of each row", port_index=1)
+    target = knext.ColumnParameter(label="target", 
+                                   description="The label (y) of each row", port_index=1) 
+    edge_list_01 = knext.ColumnParameter(label="edge_list_01", 
+                                         description="The first column of edges", port_index=0)
+    edge_list_02 = knext.ColumnParameter(label="edge_list_02", 
+                                         description="The second column of edges", port_index=0)
 
     def configure(self, configure_context, input_schema_1, input_schema_2):
         return knext.BinaryPortObjectSpec("org.knime.torch.graphcreator")
-        # return knext.Schema.from_columns([knext.Column(knext.double(), "Target")])
 
     def execute(self, exec_context, input_1, input_2):
         edges_data = input_1.to_pandas()
@@ -32,23 +36,18 @@ class GNNCreator:
         num_class = nodes_data[self.target].nunique()
 
         # handle missing values in target variables
-        nodes_data[self.target].fillna(num_class-1, inplace=True) #TODO we need to tell the user to transform missing values into 0/0
+        nodes_data[self.target].fillna(num_class-1, inplace=True) 
+        #TODO we need to tell the user to transform missing values into 0/0
         
         g = self.construct_graph(nodes_data=nodes_data,
-                                 edges_data=edges_data,
-                                )
+                                 edges_data=edges_data)
 
         graph_dict = {'graph':g,
                       'num_of_class':num_class,
                       'key': self.key}
 
         return pickle.dumps(graph_dict)
-        
-        # DEBUGGING CODE:
-        # labels = list(nodes_data[self.target])
-        # output_table = pa.table([pa.array(labels)], names=["Target"])
-        # return knext.Table.from_pyarrow(output_table)
-    
+            
     def construct_graph(self, nodes_data, edges_data):
         node_features_list = nodes_data.drop(columns=[self.key,self.target]).values.tolist()
         node_features = torch.tensor(node_features_list)
@@ -63,10 +62,10 @@ class GNNCreator:
         return(g)
 
 
-
 @knext.node(name="GNN Learner", node_type=knext.NodeType.LEARNER, icon_path="icon.png", category="/")
 @knext.input_binary("Full Graph", "Pickled Graph", "org.knime.torch.graphcreator" )
-@knext.input_table(name="Train Set", description="A table that contains nodes need to be masked and passed on.")
+@knext.input_table(name="Train Set", 
+                   description="A table that contains nodes need to be masked and passed downstream.")
 @knext.output_binary(
     name="Model",
     description="Pytorch Geometric Model",
@@ -74,11 +73,12 @@ class GNNCreator:
 )
 class GNNLearner:
     """
+    Train GNN
     """
-    #TODO Make validation accuracy be in output of the learner node 
+    hidden_channels = knext.IntParameter("Hidden Channels", "The number of hidden channels desired.", 1)
+    number_of_hidden_layers = knext.IntParameter("Hidden Layers", "The number of hidden layers desired. Recommended to use a number less than the graph diameter if unsure.", 1)
     learning_rate = knext.DoubleParameter("Learning Rate", "The learning rate to use in the optimizer", 0.1, min_value=1e-10)
     epochs = knext.IntParameter("Epochs", "The number of epochs to train for.", 1)
-    convolutional_layer = knext.StringParameter("Convolutional Layer Choice", "The convolutional layer to be used in the neural network.", "GCNConv", enum=["GCNConv", "SAGEConv"])
     criterion = nn.CrossEntropyLoss()
 
     def configure(self, configure_context, input_binary_1, input_schema_1):
@@ -94,41 +94,10 @@ class GNNLearner:
 
         num_class = graph_dict['num_of_class']
         num_of_feat = masked_graph.num_node_features
-        model = GNN(num_of_feat=num_of_feat,
-                    hidden_layer=16,
-                    num_class=num_class,
-                    convolutional_layer=self.convolutional_layer)
-
-        # #### BEGIN TRAINING ####
-        # epochs = self.epochs
-        # lr = self.learning_rate
-        # optimizer = torch.optim.Adam(model.parameters(), lr=lr)
-        
-        # train_losses=[]
-        # train_accuracies=[]
-        
-        # for e in range(epochs+1):
-        #     exec_context.set_progress(progress=e/epochs, message=f"Training {e} for {epochs}")
-        #     if exec_context.is_canceled():
-        #         raise RuntimeError("Execution terminated by user")
-        #     optimizer.zero_grad()
-        #     out=model(masked_graph)
-        #     loss=self.masked_loss(predictions=out,
-        #                           labels=masked_graph.y,
-        #                           mask=masked_graph.data_mask)
-        #     loss.backward()
-        #     optimizer.step()
-        #     train_losses+=[loss]
-        #     train_accuracy=self.masked_accuracy(predictions=out,
-        #                                         labels=masked_graph.y, 
-        #                                         mask=masked_graph.data_mask)
-        #     train_accuracies+=[float(train_accuracy)] # requires float for pyarrow
-
-        # state_dict = model.state_dict()
-        # buffer = BytesIO()
-        # torch.save(state_dict, buffer)
-        # buffer.seek(0)
-        # #### END TRAINING ####
+        model = GNN(in_channels=num_of_feat, 
+                     hidden_channels=self.hidden_channels, 
+                     out_channels=num_class, 
+                     num_layers=self.number_of_hidden_layers)
 
         train_accuracies, buffer = self.train(model, masked_graph, exec_context)
 
@@ -138,7 +107,9 @@ class GNNLearner:
                       "num_of_feat": num_of_feat,
                       "num_of_class": num_class,
                       "key": graph_dict["key"],
-                      "convolutional_layer": self.convolutional_layer}
+                      "hidden_channels": self.hidden_channels,
+                      "number_of_hidden_layers": self.number_of_hidden_layers,
+                      }
         # statistics_table = pa.table([pa.array([str(i) for i in range(len(train_accuracies))]), pa.array(train_accuracies)], names=["Train Accuracy"])
         
         return pickle.dumps(model_dict)#, knext.Table.from_pyarrow(statistics_table)
@@ -172,8 +143,8 @@ class GNNLearner:
             if exec_context.is_canceled():
                 raise RuntimeError("Execution terminated by user")
             optimizer.zero_grad()
-            out=model(g)
-            loss=self.masked_loss(predictions=out,
+            out = model(data=g)
+            loss = self.masked_loss(predictions=out,
                                   labels=g.y,
                                   mask=g.data_mask)
             loss.backward()
@@ -215,33 +186,41 @@ class GNNPredictor:
     def execute(self, exec_context, model_object, test_set):
         test_set = test_set.to_pandas()
         model_dict = pickle.loads(model_object)
-        graph = model_dict["data"]
+        data = model_dict["data"]
         num_of_feat = model_dict["num_of_feat"]
+        hidden_channels = model_dict["hidden_channels"]
         num_class = model_dict["num_of_class"]
+        number_of_hidden_layers = model_dict["number_of_hidden_layers"]
         msk = AddMask(model_dict["key"])
-        convolutional_layer = model_dict["convolutional_layer"]
-        masked_graph = msk(graph, test_set)
+        masked_graph = msk(data, test_set)
 
-        model = GNN(num_of_feat=num_of_feat,
-                    hidden_layer=16,
-                    num_class=num_class,
-                    convolutional_layer=convolutional_layer)
+        model = GNN(in_channels=num_of_feat,
+                     hidden_channels=hidden_channels,
+                     out_channels=num_class, 
+                     num_layers=number_of_hidden_layers)
 
         state_dict = torch.load(BytesIO(model_dict["model"]))
         model.load_state_dict(state_dict)
         model.eval()
-        out = model(graph)
+        out = model(data=data)
        
         key = list(test_set[model_dict["key"]])
-        labels = graph.y[masked_graph.data_mask].tolist()
+        labels = data.y[masked_graph.data_mask].tolist()
         predictions = (torch.argmax(out,axis=1)[masked_graph.data_mask]).tolist()
 
         if self.prediction_confidence:
             probabilities = out[masked_graph.data_mask]
             # convert logits output to probability
             probabilities = torch.nn.functional.softmax(probabilities)[ :, 0].tolist()
-            output_table = pa.table([pa.array(key), pa.array(labels), pa.array(predictions), pa.array(probabilities)], names=["Key", "Target", "Predictions", "Confidence of being class 0"])
+            output_table = pa.table([pa.array(key), 
+                                     pa.array(labels), 
+                                     pa.array(predictions), 
+                                     pa.array(probabilities)], 
+                                     names=["Key", "Target", "Predictions", "Confidence of being class 0"])
         else:
-            output_table = pa.table([pa.array(key), pa.array(labels), pa.array(predictions)], names=["Key", "Target", "Predictions"])
+            output_table = pa.table([pa.array(key), 
+                                     pa.array(labels), 
+                                     pa.array(predictions)], 
+                                     names=["Key", "Target", "Predictions"])
 
         return knext.Table.from_pyarrow(output_table)
