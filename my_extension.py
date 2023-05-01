@@ -1,4 +1,5 @@
 from tts import *
+from link_prediction import *
 import knime_extension as knext
 import logging
 
@@ -98,7 +99,6 @@ class GNNLearner:
                      hidden_channels=self.hidden_channels, 
                      out_channels=num_class, 
                      num_layers=self.number_of_hidden_layers)
-
         train_accuracies, buffer = self.train(model, masked_graph, exec_context)
 
         model_dict = {"model": buffer.read(),
