@@ -1,4 +1,4 @@
-# KNIME Python Extension Nodes Development
+# Custom GNN nodes for the KNIME Analytics Platform
 ### Builing Graph Neural Network workflow based on torch_geometric library
 
 _Developers: Jinwei Sun, Paolo Tamagnini, & Victor Palacios_
