@@ -1,9 +1,9 @@
-# Custom GNN nodes for the KNIME Analytics Platform
-### Builing Graph Neural Network workflow based on torch_geometric library
+# GNN with Pytorch Geometric - A KNIME Python Extension
+### Graph Nerual Networks brought to KNIME vis the Pythorch Geometric
 
 _Developers: Jinwei Sun, Paolo Tamagnini, & Victor Palacios_
 
-This  workflow provides users with the ability to leverage KNIME Analytics Platform for executing GNN tasks. It features three key nodes: GNN Graph Creator, GNN Learner, and GNN Predictor. You can utilize the KNIME file as a reference to construct your own GNN model and perform predictions on Graph Datasets.
+This KNIME extension enabes deep learning via Graph Nerual Networks in the KNIME Analytics Plotform. It features three key nodes: GNN Graph Creator, GNN Learner, and GNN Predictor. You can utilize the KNIME file as a reference to construct your own GNN model and perform predictions on Graph Datasets.
 
 To build connections and test this workflow on KNIME:
 1. Install KNIME Analytics Platform (KAP) and download Dev Folder
