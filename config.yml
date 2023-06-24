@@ -1,4 +1,4 @@
 org.tutorial.first_extension: # {group_id}.{name} from the knime.yml
-  src: /Users/victorpalacios/Desktop/PyGeometric/pyg_node/tutorial_extension # Path to folder containing the extension files
+  src: /src # Path to folder containing the extension files
   conda_env_path: /Users/victorpalacios/opt/anaconda3/envs/knime-pyg-victor # Path to the Python environment to use
   debug_mode: false # Optional line, if set to true, it will always use the latest changes of execute/configure, when that method is used within the KNIME Analytics Platform

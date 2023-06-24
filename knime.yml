@@ -1,7 +1,7 @@
 name: first_extension # Will be concatenated with the group_id to an ID
 author: Steffen
 env_yml_path: <path/to/the/conda_env.yml> # This is necessary for bundling, but not needed during development
-extension_module: my_extension # The .py Python module containing the nodes of your extension
+extension_module: src/gnn_ext # The .py Python module containing the nodes of your extension
 description: My First Extension # Human readable bundle name / description
 long_description: This extension is my first Python extension.
 group_id: org.tutorial

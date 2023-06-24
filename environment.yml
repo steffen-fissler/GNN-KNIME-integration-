@@ -5,12 +5,11 @@ channels:
 - pytorch
 - knime
 dependencies:
-- python=3.9
+- python=3.11
 - py4j
 - pandas
 - pyarrow
 - numpy
-- packaging
 - pytorch
 - cpuonly
 - pyg
