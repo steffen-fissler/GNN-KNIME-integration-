@@ -5,7 +5,6 @@ _Developers: Jinwei Sun, Paolo Tamagnini, & Victor Palacios_
 
 This KNIME extension enabes deep learning via Graph Nerual Networks in the KNIME Analytics Plotform. It features three key nodes: GNN Graph Creator, GNN Learner, and GNN Predictor. You can utilize the KNIME file as a reference to construct your own GNN model and perform predictions on Graph Datasets.
 
-#### Developer Information:
 To build connections and test this workflow on KNIME:
 1. Install KNIME Analytics Platform (KAP) and download Dev Folder
 2. Establish Connection Between KAP and Dev Folder
