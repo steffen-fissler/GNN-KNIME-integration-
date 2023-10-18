@@ -1,10 +1,10 @@
-name: first_extension # Will be concatenated with the group_id to an ID
-author: Steffen
-env_yml_path: <path/to/the/conda_env.yml> # This is necessary for bundling, but not needed during development
+name: gnn # Will be concatenated with the group_id to an ID
+author: Jinwei Sun, Victor Palacios
+env_yml_path: environment.yml # This is necessary for bundling, but not needed during development
 extension_module: src/gnn_ext # The .py Python module containing the nodes of your extension
-description: My First Extension # Human readable bundle name / description
-long_description: This extension is my first Python extension.
-group_id: org.tutorial
+description: GNN Extension # Human readable bundle name / description
+long_description: This KNIME extension enables deep learning via Graph Neural Networks in the KNIME Analytics Plotform. It features three key nodes: GNN Graph Creator, GNN Learner, and GNN Predictor. You can utilize the KNIME file as a reference to construct your own GNN model and perform predictions on Graph Datasets.
+group_id: org.knime
 version: 0.1.0 # Version of this Python node extension
 vendor: KNIME AG, Zurich, Switzerland
 license_file: LICENSE.TXT # Best practice: put your LICENSE.TXT next to the knime.yml; otherwise you would need to change to path/to/LICENSE.txt

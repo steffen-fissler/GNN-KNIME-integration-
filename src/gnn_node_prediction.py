@@ -5,7 +5,7 @@ import logging
 LOGGER = logging.getLogger(__name__)
 
 @knext.node(name="GNN Heterogeneous Graph Creator", node_type=knext.NodeType.MANIPULATOR, 
-            icon_path="icon.png", category="/")
+            icon_path="icon.png", category=category)
 @knext.input_table(name="Heterogeneous Node Connections", 
                    description="Connect a table with 2 columns - one with first type of node and other with second type of node connected to it.")
 @knext.input_table(name="Node Features", 
@@ -60,7 +60,7 @@ class GNNHeteroCreator:
         return pickle.dumps(graph_dict)
 
 
-@knext.node(name="GNN Heterogeneous Learner", node_type=knext.NodeType.LEARNER, icon_path="icon.png", category="/")
+@knext.node(name="GNN Heterogeneous Learner", node_type=knext.NodeType.LEARNER, icon_path="icon.png", category=category)
 @knext.input_binary("Full Graph", "Pickled Graph", "org.knime.torch.heterographcreator" )
 @knext.output_binary(
     name="Model",
@@ -158,7 +158,7 @@ class GNNHeteroLinkLearner:
 
 
 
-@knext.node(name="GNN Heterogeneous Predictor", node_type=knext.NodeType.PREDICTOR, icon_path="icon.png", category="/")
+@knext.node(name="GNN Heterogeneous Predictor", node_type=knext.NodeType.PREDICTOR, icon_path="icon.png", category=category)
 @knext.input_binary("GNN model", "The trained model", "org.knime.torch.heterolinklearner")
 @knext.output_table("Table with Prediction", "Append prediction probability and class to table")
 class GNNHeteroLinkPredictor:

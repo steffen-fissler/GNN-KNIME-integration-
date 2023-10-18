@@ -6,7 +6,7 @@ import logging
 LOGGER = logging.getLogger(__name__)
 
 @knext.node(name="GNN Graph Creator", node_type=knext.NodeType.MANIPULATOR, 
-            icon_path="../icons/icon.png", category="/")
+            icon_path="icons/icon.png", category=category)
 @knext.input_table(name="Nodes with Features", 
                    description="Give a table of nodes with features and target.")
 @knext.input_table(name="Edges", 
@@ -81,7 +81,7 @@ class GNNCreator:
         return(g)
 
 
-@knext.node(name="GNN Learner", node_type=knext.NodeType.LEARNER, icon_path="../icons/icon.png", category="/")
+@knext.node(name="GNN Learner", node_type=knext.NodeType.LEARNER, icon_path="icons/icon.png", category=category)
 @knext.input_binary("Full Graph", "Pickled Graph", "org.knime.torch.graphcreator" )
 @knext.input_table(name="Train Set", 
                    description="A table that contains nodes need to be masked and passed downstream.")
@@ -231,7 +231,7 @@ class GNNLearner:
 
 
 
-@knext.node(name="GNN Predictor", node_type=knext.NodeType.PREDICTOR, icon_path="../icons/icon.png", category="/")
+@knext.node(name="GNN Predictor", node_type=knext.NodeType.PREDICTOR, icon_path="icons/icon.png", category=category)
 @knext.input_binary("GNN model", "The trained model", "org.knime.torch.learner")
 @knext.input_table(name="Test Set", description="A table that contains nodes for testing.")
 @knext.output_table("Table with Prediction", "Append prediction probability and class to table")
