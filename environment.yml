@@ -1,17 +1,18 @@
 name: knime-pyg-node
 channels:
-- conda-forge
-- pyg
-- pytorch
-- knime
+  - conda-forge
+  - pytorch
+  - knime
 dependencies:
-- python=3.11
-- py4j
-- pandas
-- pyarrow
-- numpy
-- pytorch
-- cpuonly
-- pyg
-- knime-extension
-- markdown
+  - python=3.11
+  - py4j
+  - pandas
+  - pyarrow
+  - numpy
+  - pytorch
+  - cpuonly
+  - knime-extension
+  - markdown
+  - pip=23.1.2
+  - pip:
+      - torch_geometric==2.4.0
