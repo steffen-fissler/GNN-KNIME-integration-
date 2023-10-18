@@ -1,3 +1,5 @@
+import knime.extension as knext
+
 category = knext.category(
     path="/community",
     level_id="ts",
